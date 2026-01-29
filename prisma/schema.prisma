@@ -59,8 +59,6 @@ model TestRun {
   topK           Int
   temperature    Float
   prompt         String
-  status         TEST_RUN_STATUS @default(PENDING)
-  failReason     String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   completedAt    DateTime?
@@ -68,15 +66,17 @@ model TestRun {
 }
 
 model TestRunResult {
-  id             String   @id @default(cuid())
+  id             String          @id @default(cuid())
   runId          String
-  testRun        TestRun  @relation(fields: [runId], references: [id])
+  testRun        TestRun         @relation(fields: [runId], references: [id])
   caseId         String
-  testCase       TestCase @relation(fields: [caseId], references: [id])
+  testCase       TestCase        @relation(fields: [caseId], references: [id])
+  status         TEST_RUN_STATUS @default(PENDING)
+  failReason     String?
   answer         String
   bleuScore      Float
   cosineSimScore Float
   llmScore       Float
   llmScoreReason String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime        @default(now())
 }
