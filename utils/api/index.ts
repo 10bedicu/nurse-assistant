@@ -2,17 +2,6 @@ import { testApi } from "./tests";
 
 type endpoint = `/${string}`;
 
-export type PaginatedResponse<T> = {
-  hasMore: boolean;
-  limit: number;
-  offset: number;
-  results: T[];
-};
-
-export type PaginatedCResponse<T> = PaginatedResponse<T> & {
-  count: number;
-};
-
 export type ResponseError = {
   [key: string]: string[] | undefined;
 };
