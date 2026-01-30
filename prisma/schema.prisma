@@ -103,6 +103,7 @@ model Project {
   topP        Float
   topK        Int
   temperature Float
+  current     Boolean   @default(false)
   contexts    Context[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

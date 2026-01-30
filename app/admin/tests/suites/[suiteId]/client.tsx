@@ -87,7 +87,7 @@ export default function Client(props: {
       API.tests.suites.run(suite.id, data),
     onSuccess: (data) => {
       toast.success("Test run created successfully");
-      router.push(`/tests/runs/${data.id}`);
+      router.push(`/admin/tests/runs/${data.id}`);
     },
   });
 

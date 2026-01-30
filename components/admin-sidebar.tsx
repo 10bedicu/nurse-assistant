@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Bot, ChevronRight, SquareTerminal } from "lucide-react";
+import {
+  Bot,
+  ChevronRight,
+  SquareTerminal,
+  FileText,
+  MessageSquare,
+  FolderKanban,
+} from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
@@ -96,15 +103,23 @@ export function AdminSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link href={"/admin/context"}>
-                <Bot />
+                <FileText />
                 <span>Context</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
+              <Link href={"/admin/prompts"}>
+                <MessageSquare />
+                <span>Prompts</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
               <Link href={"/admin/projects"}>
-                <Bot />
+                <FolderKanban />
                 <span>Projects</span>
               </Link>
             </SidebarMenuButton>

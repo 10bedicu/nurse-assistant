@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 
 export default function Client(props: {
   suites: PaginatedResponse<TestSuiteSerialized>;
@@ -123,9 +124,14 @@ export default function Client(props: {
           </SheetContent>
         </Sheet>
       </div>
-      <div className="flex flex-col gap-4 mt-8">
+      <InfiniteScroll
+        onLoadMore={() => suitesQuery.fetchNextPage()}
+        hasMore={suitesQuery.hasNextPage ?? false}
+        isFetching={suitesQuery.isFetching}
+        className="flex flex-col gap-4 mt-8"
+      >
         {suites.map((suite) => (
-          <Link key={suite.id} href={`/tests/suites/${suite.id}`}>
+          <Link key={suite.id} href={`/admin/tests/suites/${suite.id}`}>
             <Card>
               <CardHeader>
                 <CardTitle>{suite.name}</CardTitle>
@@ -133,7 +139,7 @@ export default function Client(props: {
             </Card>
           </Link>
         ))}
-      </div>
+      </InfiniteScroll>
     </div>
   );
 }

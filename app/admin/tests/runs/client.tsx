@@ -17,6 +17,7 @@ import { TestRunSerialized } from "@/utils/schemas/tests";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import Link from "next/link";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 
 export default function Client(props: {
   runs: PaginatedResponse<TestRunSerialized>;
@@ -37,7 +38,12 @@ export default function Client(props: {
       <div className="flex items-center gap-2 justify-between">
         <h1 className="text-2xl font-semibold">Test Runs</h1>
       </div>
-      <div className="mt-4 flex flex-col gap-4">
+      <InfiniteScroll
+        onLoadMore={() => testRunsQuery.fetchNextPage()}
+        hasMore={testRunsQuery.hasNextPage ?? false}
+        isFetching={testRunsQuery.isFetching}
+        className="mt-4 flex flex-col gap-4"
+      >
         {testRuns.map((run) => {
           const metrics = [
             {
@@ -86,7 +92,7 @@ export default function Client(props: {
           );
 
           return (
-            <Link href={`/tests/runs/${run.id}`} key={run.id}>
+            <Link href={`/admin/tests/runs/${run.id}`} key={run.id}>
               <Card>
                 <CardHeader>
                   <CardTitle>{run.suite.name}</CardTitle>
@@ -115,7 +121,7 @@ export default function Client(props: {
             </Link>
           );
         })}
-      </div>
+      </InfiniteScroll>
     </div>
   );
 }

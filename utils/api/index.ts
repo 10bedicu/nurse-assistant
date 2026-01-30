@@ -1,5 +1,6 @@
 import { contextApi } from "./context";
 import { testApi } from "./tests";
+import { projectApi, promptApi } from "./project";
 
 type endpoint = `/${string}`;
 
@@ -104,4 +105,6 @@ export const request = async <T = any>(
 export const API = {
   tests: testApi,
   context: contextApi,
+  projects: projectApi,
+  prompts: promptApi,
 };
