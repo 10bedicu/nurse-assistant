@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
+.env
 .env.local
+.env*.local
 
 # vercel
 .vercel
@@ -40,5 +42,33 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-#prisma client
+# prisma client
 /prisma/client/
+
+# IDE and AI tools
+.cursor/
+.claude/
+.agents/
+.agent/
+.codex/
+.aider*
+.continue/
+.codeium/
+.tabnine/
+.sourcegraph/
+.gemini/
+.opencode/
+.copilot/
+
+# Editor specific
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# AI conversation logs
+*.plan.md
+.cursorignore

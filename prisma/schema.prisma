@@ -45,7 +45,7 @@ model Context {
 
 enum TEST_RUN_STATUS {
   PENDING
-  RUNNNING
+  RUNNING
   SCORING
   COMPLETED
   FAILED
