@@ -256,7 +256,7 @@ export default function Client(props: {
                     variant={"secondary"}
                     className="w-full"
                   >
-                    <Link href={"/context?new=true"}>Create Context</Link>
+                    <Link href={"/admin/context?new=true"}>Create Context</Link>
                   </Button>
                 </div>
                 <SheetFooter>

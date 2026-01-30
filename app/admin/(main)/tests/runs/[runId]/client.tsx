@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { API } from "@/utils/api";
 import { LLMS } from "@/utils/constants";
 import { TestRunSerialized } from "@/utils/schemas/tests";
@@ -25,6 +26,42 @@ export default function Client(props: { run: TestRunSerialized }) {
   });
 
   const run = runQuery.data;
+
+  const downloadCSV = () => {
+    // Generate CSV content
+    const headers = "question,expectedanswer,answerrecieved\n";
+    const rows = run.runs
+      .map((r) => {
+        const tcase = run.suite.testCases.find((tc) => tc.id === r.caseId);
+        if (!tcase) return null;
+
+        // Escape quotes and wrap in quotes if contains comma or quote
+        const escapeCSV = (str: string) => {
+          if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+
+        return `${escapeCSV(tcase.questionText || "")},${escapeCSV(tcase.expectedAnswer)},${escapeCSV(r.answer || "")}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    const csvContent = headers + rows;
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", `test-run-${run.id}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const metrics = [
     {
@@ -77,30 +114,37 @@ export default function Client(props: { run: TestRunSerialized }) {
     <div>
       <div className="flex items-center gap-2 justify-between">
         <h1 className="text-2xl font-semibold">Test Run</h1>
-        <h1 className="text-2xl">
-          {isFailed && (
-            <span className="text-red-600 font-semibold">FAILED</span>
-          )}
-          {isRunning && (
-            <span className="text-blue-600 font-semibold animate-pulse">
-              {" "}
-              {completePercentage}% Complete{" "}
-            </span>
-          )}
-          {isComplete && (
-            <span className="text-green-600 font-semibold">Complete</span>
-          )}
-        </h1>
-      </div>
-      <div className="flex flex-col md:flex-row gap-4 mt-8 ">
-        <div className="grid grid-cols-2 gap-1 gap-x-4 opacity-80">
-          {metrics.map((metric) => (
-            <div key={metric.name}>
-              <strong>{metric.name}:</strong> {metric.value}
-            </div>
-          ))}
+        <div className="flex items-center gap-4">
+          <Button onClick={downloadCSV} variant="outline" size="sm">
+            Download CSV
+          </Button>
+          <h1 className="text-2xl">
+            {isFailed && (
+              <span className="text-red-600 font-semibold">FAILED</span>
+            )}
+            {isRunning && (
+              <span className="text-blue-600 font-semibold animate-pulse">
+                {" "}
+                {completePercentage}% Complete{" "}
+              </span>
+            )}
+            {isComplete && (
+              <span className="text-green-600 font-semibold">Complete</span>
+            )}
+          </h1>
         </div>
-        <div className="flex flex-col gap-4 w-full md:w-1/3 shrink-0">
+      </div>
+      <div className="flex flex-col md:flex-row-reverse gap-4 mt-8">
+        <div className=" md:w-1/3 shrink-0">
+          <div className="grid grid-cols-1 gap-1 gap-x-4 opacity-80">
+            {metrics.map((metric) => (
+              <div key={metric.name}>
+                <strong>{metric.name}:</strong> {metric.value}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 w-full">
           {run.runs.map((r) => {
             const tcase = run.suite.testCases.find((tc) => tc.id === r.caseId);
 
