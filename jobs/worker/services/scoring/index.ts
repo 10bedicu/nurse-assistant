@@ -97,7 +97,12 @@ export function calculateAggregateScore(scores: ScoreResult): number {
 }
 
 // Re-export individual scoring functions for direct use
-export { calculateBleuScore, calculateSmoothBleuScore } from "./bleu";
+export {
+  calculateBleuScore,
+  calculateSmoothBleuScore,
+  calculateRawBleuScore,
+  calculateRawSmoothBleuScore,
+} from "./bleu";
 export {
   calculateEmbeddingCosineSimilarity,
   calculateTfIdfCosineSimilarity,
