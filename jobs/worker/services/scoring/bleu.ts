@@ -5,24 +5,70 @@
  * machine-generated text against reference text.
  *
  * Score ranges from 0 to 1, where:
- * - 1.0 = perfect match
- * - 0.0 = no n-gram overlap
+ * - 1.0 = perfect match (excellent similarity)
+ * - 0.0 = no n-gram overlap (poor similarity)
  *
  * Implementation follows the standard BLEU algorithm with:
  * - N-gram precision (1-gram to 4-gram by default)
  * - Brevity penalty for short outputs
  * - Geometric mean of precisions
+ *
+ * For LLM evaluation, raw BLEU scores are normalized using a sigmoid function
+ * to spread scores more meaningfully across the 0-1 range, since raw BLEU
+ * scores tend to cluster in the 0.1-0.3 range even for semantically good answers.
+ *
+ * Reference: https://www.geeksforgeeks.org/nlp/nlp-bleu-score-for-evaluating-neural-machine-translation-python/
+ *
+ * Formula: BLEU = BP * exp(Σ(w_i * ln(p_i)))
+ * Where:
+ *   - BP = Brevity Penalty = exp(1 - r/c) if c < r, else 1
+ *   - w_i = weight for n-gram (typically 0.25 for each)
+ *   - p_i = modified n-gram precision (clipped by max reference count)
  */
 
 /**
- * Calculate BLEU score between candidate and reference text
+ * Normalize raw BLEU score using sigmoid function
+ *
+ * Raw BLEU scores for LLM-generated text tend to be very low (0.1-0.3)
+ * even for semantically good answers. This sigmoid normalization spreads
+ * scores more meaningfully across the 0-1 range.
+ *
+ * @param rawScore - Raw BLEU score (0-1)
+ * @param midpoint - Center point of sigmoid curve (default: 0.2)
+ * @param steepness - How steep the sigmoid curve is (default: 10)
+ * @returns Normalized score (0-1) with better distribution
+ */
+function normalizeWithSigmoid(
+  rawScore: number,
+  midpoint: number = 0.2,
+  steepness: number = 10
+): number {
+  // Clamp input to 0-1 range
+  const clampedScore = Math.max(0, Math.min(1, rawScore));
+
+  // Apply sigmoid: σ(x) = 1 / (1 + e^(-k*(x-m)))
+  const sigmoid = 1 / (1 + Math.exp(-steepness * (clampedScore - midpoint)));
+
+  // Normalize to ensure output is exactly 0 at input 0 and 1 at input 1
+  const sigmoidAt0 = 1 / (1 + Math.exp(-steepness * (0 - midpoint)));
+  const sigmoidAt1 = 1 / (1 + Math.exp(-steepness * (1 - midpoint)));
+
+  // Linear interpolation to map sigmoid output to 0-1
+  const normalized = (sigmoid - sigmoidAt0) / (sigmoidAt1 - sigmoidAt0);
+
+  // Final clamp to ensure output is exactly in 0-1 range
+  return Math.max(0, Math.min(1, normalized));
+}
+
+/**
+ * Calculate raw BLEU score (standard algorithm, no normalization)
  *
  * @param candidate - Generated/predicted text
  * @param reference - Expected/ground truth text
  * @param maxN - Maximum n-gram size (default: 4)
- * @returns BLEU score between 0 and 1
+ * @returns Raw BLEU score between 0 and 1
  */
-export function calculateBleuScore(
+export function calculateRawBleuScore(
   candidate: string,
   reference: string,
   maxN: number = 4
@@ -32,11 +78,7 @@ export function calculateBleuScore(
   const referenceTokens = tokenize(reference);
 
   // Handle edge cases
-  if (candidateTokens.length === 0) {
-    return 0;
-  }
-
-  if (referenceTokens.length === 0) {
+  if (candidateTokens.length === 0 || referenceTokens.length === 0) {
     return 0;
   }
 
@@ -48,37 +90,51 @@ export function calculateBleuScore(
     const referenceNgrams = getNgrams(referenceTokens, n);
 
     if (candidateNgrams.length === 0) {
-      // No n-grams of this size possible
       continue;
     }
 
-    // Count matching n-grams (with clipping)
     const precision = calculateClippedPrecision(candidateNgrams, referenceNgrams);
     precisions.push(precision);
   }
 
-  // If no valid precisions, return 0
   if (precisions.length === 0) {
     return 0;
   }
 
-  // Check if any precision is 0 (would make geometric mean 0)
+  // Handle zero precisions with smoothing
   if (precisions.some((p) => p === 0)) {
-    // Use smoothing: add small epsilon to zero precisions
     const smoothedPrecisions = precisions.map((p) => (p === 0 ? 0.001 : p));
     const geometricMean = calculateGeometricMean(smoothedPrecisions);
     const bp = calculateBrevityPenalty(candidateTokens.length, referenceTokens.length);
     return bp * geometricMean;
   }
 
-  // Calculate geometric mean of precisions
   const geometricMean = calculateGeometricMean(precisions);
-
-  // Calculate brevity penalty
   const bp = calculateBrevityPenalty(candidateTokens.length, referenceTokens.length);
 
-  // Final BLEU score
   return bp * geometricMean;
+}
+
+/**
+ * Calculate BLEU score between candidate and reference text
+ * (with sigmoid normalization for better 0-1 distribution)
+ *
+ * @param candidate - Generated/predicted text
+ * @param reference - Expected/ground truth text
+ * @param maxN - Maximum n-gram size (default: 4)
+ * @returns Normalized BLEU score between 0 and 1
+ *          - Closer to 1.0 = excellent match (good)
+ *          - Closer to 0.0 = poor match (bad)
+ */
+export function calculateBleuScore(
+  candidate: string,
+  reference: string,
+  maxN: number = 4
+): number {
+  const rawScore = calculateRawBleuScore(candidate, reference, maxN);
+
+  // Apply sigmoid normalization for better score distribution
+  return normalizeWithSigmoid(rawScore);
 }
 
 /**
@@ -164,10 +220,10 @@ function calculateBrevityPenalty(candidateLength: number, referenceLength: numbe
 }
 
 /**
- * Calculate sentence-level BLEU with smoothing
+ * Calculate raw sentence-level BLEU with smoothing (no sigmoid normalization)
  * Better for single sentence evaluation
  */
-export function calculateSmoothBleuScore(
+export function calculateRawSmoothBleuScore(
   candidate: string,
   reference: string,
   maxN: number = 4
@@ -205,4 +261,26 @@ export function calculateSmoothBleuScore(
   const bp = calculateBrevityPenalty(candidateTokens.length, referenceTokens.length);
 
   return bp * geometricMean;
+}
+
+/**
+ * Calculate sentence-level BLEU with smoothing and sigmoid normalization
+ * Better for single sentence evaluation (LLM evaluation use case)
+ *
+ * @param candidate - Generated/predicted text
+ * @param reference - Expected/ground truth text
+ * @param maxN - Maximum n-gram size (default: 4)
+ * @returns Normalized BLEU score between 0 and 1
+ *          - Closer to 1.0 = excellent match (good)
+ *          - Closer to 0.0 = poor match (bad)
+ */
+export function calculateSmoothBleuScore(
+  candidate: string,
+  reference: string,
+  maxN: number = 4
+): number {
+  const rawScore = calculateRawSmoothBleuScore(candidate, reference, maxN);
+
+  // Apply sigmoid normalization for better score distribution
+  return normalizeWithSigmoid(rawScore);
 }
