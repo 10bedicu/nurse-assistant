@@ -123,3 +123,28 @@ export const testRunCreateSchema = z.object({
 });
 
 export type TestRunCreatePayload = z.infer<typeof testRunCreateSchema>;
+
+// Schema for importing questions from JSON
+export const testCaseImportItemSchema = z
+  .object({
+    questionText: z.string().optional(),
+    questionAudioPath: z.string().optional(),
+    questionImagePath: z.string().optional(),
+    expectedAnswer: z.string().min(1),
+  })
+  .refine(
+    (data) =>
+      data.questionText || data.questionAudioPath || data.questionImagePath,
+    {
+      message:
+        "At least one of questionText, questionAudioPath, or questionImagePath is required",
+    },
+  );
+
+export const testCasesImportSchema = z.object({
+  questions: z
+    .array(testCaseImportItemSchema)
+    .min(1, "At least one question is required"),
+});
+
+export type TestCasesImportPayload = z.infer<typeof testCasesImportSchema>;

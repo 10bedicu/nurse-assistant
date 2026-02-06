@@ -3,6 +3,7 @@ import { LimitOffset, PaginatedResponse } from "../schemas/base";
 import {
   TestCaseCreatePayload,
   TestCaseSerialized,
+  TestCasesImportPayload,
   TestRunCreatePayload,
   TestRunSerialized,
   TestSuiteCreatePayload,
@@ -36,6 +37,12 @@ export const testApi = {
         request(`/tests/suites/${suiteId}/cases`, "POST", data),
       delete: (suiteId: string, caseId: string) =>
         request(`/tests/suites/${suiteId}/cases/${caseId}`, "DELETE"),
+      import: (suiteId: string, data: TestCasesImportPayload) =>
+        request<{ imported: number; cases: TestCaseSerialized[] }>(
+          `/tests/suites/${suiteId}/cases/import`,
+          "POST",
+          data,
+        ),
     },
     run: (suiteId: string, data: TestRunCreatePayload) =>
       request<TestRunSerialized>(`/tests/suites/${suiteId}/run`, "POST", data),

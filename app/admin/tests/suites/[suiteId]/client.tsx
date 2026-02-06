@@ -46,12 +46,13 @@ import {
 import { PromptSerialized } from "@/utils/schemas/project";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { PlayIcon, Volume2Icon } from "lucide-react";
+import { DownloadIcon, PlayIcon, UploadIcon, Volume2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { TestCasesImportPayload } from "@/utils/schemas/tests";
 
 type QuestionInputMode = "text" | "audio";
 
@@ -64,6 +65,7 @@ export default function Client(props: {
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
   const [createQuestionMode, setCreateQuestionMode] =
     useState<QuestionInputMode>("text");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const suiteQuery = useQuery({
     queryKey: ["suites", serverSuite.id],
@@ -131,7 +133,84 @@ export default function Client(props: {
     },
   });
 
+  const importCasesMutation = useMutation({
+    mutationFn: (data: TestCasesImportPayload) =>
+      API.tests.suites.cases.import(serverSuite.id, data),
+    onSuccess: (data) => {
+      toast.success(`Successfully imported ${data.imported} questions`);
+      suiteQuery.refetch();
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to import questions");
+    },
+  });
+
   const suite = suiteQuery.data;
+
+  // Export all questions as JSON
+  const exportQuestions = () => {
+    const questions = suite.testCases.map((tc) => ({
+      questionText: tc.questionText || undefined,
+      questionAudioPath: tc.questionAudioPath || undefined,
+      questionImagePath: tc.questionImagePath || undefined,
+      expectedAnswer: tc.expectedAnswer,
+    }));
+
+    const exportData = {
+      suiteName: suite.name,
+      exportedAt: new Date().toISOString(),
+      questions,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${suite.name.replace(/[^a-z0-9]/gi, "_")}_questions.json`,
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Handle file import
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+
+        // Support both formats: { questions: [...] } or just [...]
+        const questions = Array.isArray(data) ? data : data.questions;
+
+        if (!questions || !Array.isArray(questions)) {
+          toast.error(
+            "Invalid JSON format. Expected { questions: [...] } or an array of questions.",
+          );
+          return;
+        }
+
+        importCasesMutation.mutate({ questions });
+      } catch (err) {
+        toast.error("Failed to parse JSON file");
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input so the same file can be selected again
+    event.target.value = "";
+  };
 
   const createCaseForm = useForm({
     defaultValues: {
@@ -197,10 +276,35 @@ export default function Client(props: {
 
   return (
     <div>
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportFile}
+        accept=".json"
+        className="hidden"
+      />
+
       <div className="flex items-center gap-2 justify-between">
         <h1 className="text-2xl font-semibold">"{suite.name}" Test Suite</h1>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={exportQuestions}
+            disabled={suite.testCases.length === 0}
+          >
+            <DownloadIcon className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importCasesMutation.isPending}
+          >
+            <UploadIcon className="h-4 w-4 mr-1" />
+            Import
+          </Button>
           <Button
             variant="outline"
             className="text-red-500"
