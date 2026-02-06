@@ -2,6 +2,8 @@
 
 An AI-powered assistant that helps nurses quickly find answers to context-specific questions, leveraging LLMs to provide accurate and relevant information.
 
+![Screenshot](public/screenshots/screenshot.png)
+
 > **Note:** This is a **pnpm-only** project. Please use pnpm for all package management.
 
 ## Prerequisites
