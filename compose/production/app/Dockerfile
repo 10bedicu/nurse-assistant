@@ -20,7 +20,6 @@ COPY . .
 
 EXPOSE 3000
 
-RUN pnpm prisma migrate deploy
 RUN pnpm prisma generate
 
 CMD pnpm start
