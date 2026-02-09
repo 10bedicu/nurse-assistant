@@ -22,4 +22,6 @@ EXPOSE 3000
 
 RUN pnpm prisma generate
 
+RUN pnpm build
+
 CMD pnpm start
