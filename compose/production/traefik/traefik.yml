@@ -19,7 +19,7 @@ certificatesResolvers:
   letsencrypt:
     # https://docs.traefik.io/master/https/acme/#lets-encrypt
     acme:
-      email: "mail@shivank.net"
+      email: "info@10bedicu.in"
       storage: /etc/traefik/acme/acme.json
       # https://docs.traefik.io/master/https/acme/#httpchallenge
       httpChallenge:
@@ -28,7 +28,7 @@ certificatesResolvers:
 http:
   routers:
     web-secure-router:
-      rule: "Host(`nurse-assistant.shivank.dev`)"
+      rule: "Host(`assistant.10bedicu.in`)"
       entryPoints:
         - web-secure
       service: app
