@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Plus } from "lucide-react";
+import { LogOut, MessageSquare, Plus } from "lucide-react";
 
 import {
   Sidebar,
@@ -19,10 +19,17 @@ import Link from "next/link";
 import { API } from "@/utils/api";
 import { ChatSerialized } from "@/utils/schemas/chat";
 import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { authTokenAtom } from "@/utils/store";
+import { useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 
 export function MainSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const [, setAuthToken] = useAtom(authTokenAtom);
+  const router = useRouter();
+
   const { data: chats = [], isLoading: loading } = useQuery({
     queryKey: ["chats"],
     queryFn: async () => {
@@ -77,7 +84,20 @@ export function MainSidebar({
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        <ModeToggle />
+        <div className="flex items-center gap-2">
+          <ModeToggle />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              setAuthToken(null);
+              router.push("/login");
+            }}
+          >
+            <LogOut className="h-[1.2rem] w-[1.2rem]" />
+            <span className="sr-only">Logout</span>
+          </Button>
+        </div>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

@@ -1,0 +1,66 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: compose/local/app/Dockerfile
+    ports:
+      - "3000:3000"
+      - "5555:5555"
+    volumes:
+      - .:/app
+      - prisma_client:/app/prisma/client
+      - node_modules:/app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
+      REDIS_URL: redis://redis:6379
+
+  worker:
+    build:
+      context: .
+      dockerfile: compose/local/app/Dockerfile
+    command: pnpm worker
+    volumes:
+      - .:/app
+      - prisma_client:/app/prisma/client
+      - node_modules:/app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
+      REDIS_URL: redis://redis:6379
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./compose/production/postgres/Dockerfile
+    ports:
+      - "5432:5432"
+    volumes:
+      - local_postgres_data:/var/lib/postgresql/data
+      - local_postgres_data_backups:/backups
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: nurse_assistant
+      POSTGRES_USER: nurse_assistant
+      POSTGRES_PASSWORD: nurse_assistant
+      POSTGRES_PORT: 5432
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - local_redis_data:/data
+
+volumes:
+  prisma_client:
+  node_modules:
+  local_postgres_data:
+  local_postgres_data_backups:
+  local_redis_data:

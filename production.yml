@@ -1,0 +1,68 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: compose/production/app/Dockerfile
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
+      REDIS_URL: redis://redis:6379
+    restart: always
+
+  worker:
+    build:
+      context: .
+      dockerfile: compose/production/app/Dockerfile
+    command: pnpm worker
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
+      REDIS_URL: redis://redis:6379
+    restart: always
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./compose/production/postgres/Dockerfile
+    volumes:
+      - production_postgres_data:/var/lib/postgresql/data
+      - production_postgres_data_backups:/backups
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: nurse_assistant
+      POSTGRES_USER: nurse_assistant
+      POSTGRES_PASSWORD: nurse_assistant
+      POSTGRES_PORT: 5432
+    restart: always
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - production_redis_data:/data
+    restart: always
+
+  traefik:
+    build:
+      context: .
+      dockerfile: ./compose/production/traefik/Dockerfile
+    depends_on:
+      - app
+    volumes:
+      - traefik-data:/etc/traefik/acme
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+
+volumes:
+  traefik-data:
+  production_postgres_data:
+  production_postgres_data_backups:
+  production_redis_data:

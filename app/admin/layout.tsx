@@ -6,8 +6,20 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { getServerCookie } from "@/utils/store";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const cookieStore = await cookies();
+  const token = getServerCookie(cookieStore, "nurseAssistantAuthToken", "");
+
+  if (!token) redirect("/login");
+
   return (
     <SidebarProvider>
       <AdminSidebar />
