@@ -28,7 +28,7 @@ certificatesResolvers:
 http:
   routers:
     web-secure-router:
-      rule: "Host(`nurse-assistant.shivank.net`)"
+      rule: "Host(`nurse-assistant.shivank.dev`)"
       entryPoints:
         - web-secure
       service: app

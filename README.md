@@ -82,3 +82,22 @@ To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+## Docker Deployment
+
+Make sure to update `compose/production/traefik/traefik.yml` with your domain and set the appropriate environment variables in `.env.local`.
+Then run
+
+```
+docker compose -f production.yml up -d
+```
+
+The application will be available at the domain you configured in Traefik.
+
+Make sure to run
+
+```
+pnpm prisma migrate deploy
+```
+
+in the app container to apply database migrations before starting the application.

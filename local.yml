@@ -15,14 +15,12 @@ services:
       - redis
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
-      REDIS_URL: redis://redis:6379
 
   worker:
     build:
       context: .
       dockerfile: compose/local/app/Dockerfile
-    command: pnpm worker
+    command: pnpm worker:watch
     volumes:
       - .:/app
       - prisma_client:/app/prisma/client
@@ -32,8 +30,6 @@ services:
       - redis
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
-      REDIS_URL: redis://redis:6379
 
   postgres:
     build:
