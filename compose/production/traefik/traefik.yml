@@ -40,7 +40,7 @@ http:
     app:
       loadBalancer:
         servers:
-          - url: http://app:80
+          - url: http://app:3000
 
 providers:
   # https://docs.traefik.io/master/providers/file/
