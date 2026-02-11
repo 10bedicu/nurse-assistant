@@ -11,17 +11,14 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory inside the container
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Source code is bind-mounted from host.
+# node_modules is a shared Docker volume — install happens at startup
+# so native binaries are built for Linux, and both app & worker share it.
 
-# Install dependencies using pnpm
-RUN pnpm install --frozen-lockfile
-
-COPY . .
-
-# Expose port 8080 for the Express server
 EXPOSE 3000
 
-RUN pnpm prisma generate
+COPY compose/local/app/start.sh /start.sh
+COPY compose/local/app/worker-start.sh /worker-start.sh
+RUN chmod +x /start.sh /worker-start.sh
 
-# Run migrations and start the Express server 
-CMD pnpm dev & pnpm prisma studio
+CMD ["/start.sh"]

@@ -8,8 +8,8 @@ services:
       - "5555:5555"
     volumes:
       - .:/app
-      - prisma_client:/app/prisma/client
       - node_modules:/app/node_modules
+      - prisma_client:/app/prisma/client
     depends_on:
       - postgres
       - redis
@@ -20,11 +20,11 @@ services:
     build:
       context: .
       dockerfile: compose/local/app/Dockerfile
-    command: pnpm worker:watch
+    command: /worker-start.sh
     volumes:
       - .:/app
-      - prisma_client:/app/prisma/client
       - node_modules:/app/node_modules
+      - prisma_client:/app/prisma/client
     depends_on:
       - postgres
       - redis
@@ -55,8 +55,8 @@ services:
       - local_redis_data:/data
 
 volumes:
-  prisma_client:
   node_modules:
+  prisma_client:
   local_postgres_data:
   local_postgres_data_backups:
   local_redis_data:

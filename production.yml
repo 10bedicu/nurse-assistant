@@ -8,9 +8,6 @@ services:
       - redis
     environment:
       NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
-      REDIS_URL: redis://redis:6379
     restart: always
 
   worker:
@@ -23,8 +20,6 @@ services:
       - redis
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://nurse_assistant:nurse_assistant@postgres:5432/nurse_assistant
-      REDIS_URL: redis://redis:6379
     restart: always
 
   postgres:
