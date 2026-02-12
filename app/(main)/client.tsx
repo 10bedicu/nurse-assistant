@@ -10,10 +10,9 @@ import {
   Send,
   Loader2,
   AlertCircle,
-  Volume2,
-  VolumeX,
   MessageSquare,
   Plus,
+  Square,
 } from "lucide-react";
 import { Persona } from "@/components/ai-elements/persona";
 import { ChatSerialized } from "@/utils/schemas/chat";
@@ -53,7 +52,6 @@ export default function Client(props: {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [contexts, setContexts] = useState<ContextSerialized[]>([]);
   const [tokenCount, setTokenCount] = useState(0);
 
@@ -535,7 +533,6 @@ export default function Client(props: {
     setIsSpeaking(false);
     setIsListening(false);
     setIsMicMuted(false);
-    setIsSpeakerMuted(false);
     setError(null);
   };
 
@@ -581,35 +578,20 @@ export default function Client(props: {
     }
   };
 
+  const interruptAgent = () => {
+    if (sessionRef.current) {
+      sessionRef.current.interrupt();
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
+      streamingMessageRef.current = null;
+    }
+  };
+
   const toggleMicMute = () => {
     if (sessionRef.current) {
       const newMutedState = !isMicMuted;
       sessionRef.current.mute(newMutedState);
       setIsMicMuted(newMutedState);
-    }
-  };
-
-  const toggleSpeakerMute = () => {
-    const newMutedState = !isSpeakerMuted;
-    setIsSpeakerMuted(newMutedState);
-
-    // Access the WebRTC transport's connection state to get the peer connection
-    if (sessionRef.current?.transport) {
-      const transport = sessionRef.current.transport as any;
-
-      // The OpenAI SDK stores the peer connection in connectionState.peerConnection
-      const connectionState = transport.connectionState;
-      const peerConnection: RTCPeerConnection | undefined =
-        connectionState?.peerConnection;
-
-      if (peerConnection) {
-        // Mute incoming audio by disabling receiver tracks (this is the speaker output)
-        peerConnection.getReceivers().forEach((receiver: RTCRtpReceiver) => {
-          if (receiver.track && receiver.track.kind === "audio") {
-            receiver.track.enabled = !newMutedState;
-          }
-        });
-      }
     }
   };
 
@@ -797,17 +779,17 @@ export default function Client(props: {
                     )}
                   </Button>
                   <Button
-                    onClick={toggleSpeakerMute}
-                    variant={isSpeakerMuted ? "destructive" : "outline"}
+                    onClick={interruptAgent}
+                    variant="destructive"
                     size="icon"
-                    className="flex-1 w-15 h-15 aspect-square rounded-full"
-                    title={isSpeakerMuted ? "Unmute sound" : "Mute sound"}
-                  >
-                    {isSpeakerMuted ? (
-                      <VolumeX className="h-5 w-5" />
-                    ) : (
-                      <Volume2 className="h-5 w-5" />
+                    disabled={!isSpeaking}
+                    className={cn(
+                      "flex-1 w-15 h-15 aspect-square rounded-full transition-opacity duration-300 opacity-0 disabled:opacity-0",
+                      isSpeaking && "opacity-100",
                     )}
+                    title="Stop speaking"
+                  >
+                    <Square className="h-5 w-5" />
                   </Button>
                 </div>
               )}
