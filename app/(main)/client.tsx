@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { getEncoding } from "js-tiktoken";
 import { ProjectSerialized } from "@/utils/schemas/project";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,13 @@ import { Persona } from "@/components/ai-elements/persona";
 import { ChatSerialized } from "@/utils/schemas/chat";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { RealtimeAgent } from "@openai/agents/realtime";
-import { RealtimeSession } from "@openai/agents/realtime";
 import { Badge } from "@/components/ui/badge";
 import { ContextSerialized } from "@/utils/schemas/context";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { LLMS, PATIENT_INFO } from "@/utils/constants";
+import { createVoiceEngine, type VoiceEngine } from "@/lib/voice";
 
 interface Message {
   id?: string;
@@ -57,8 +56,7 @@ export default function Client(props: {
   const [contexts, setContexts] = useState<ContextSerialized[]>([]);
   const [tokenCount, setTokenCount] = useState(0);
 
-  const sessionRef = useRef<RealtimeSession | null>(null);
-  const agentRef = useRef<RealtimeAgent | null>(null);
+  const engineRef = useRef<VoiceEngine | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldCreateChatRef = useRef(false);
   const streamingMessageRef = useRef<{
@@ -74,10 +72,13 @@ export default function Client(props: {
   // Get the context limit for the realtime model (use 90% of actual limit)
   const contextLimit = useMemo(() => {
     const realtimeModel = Object.entries(LLMS).find(
-      ([_, config]) => config.realtime,
+      ([_, config]) => "realtime" in config && config.realtime,
     );
-    const actualLimit = realtimeModel ? realtimeModel[1].contextLimit : 32_000;
-    return Math.floor(actualLimit * 0.9);
+    const actualLimit =
+      realtimeModel && "contextLimit" in realtimeModel[1]
+        ? realtimeModel[1].contextLimit
+        : 32_000;
+    return Math.floor((actualLimit ?? 32_000) * 0.9);
   }, []);
 
   // Track if conversation limit is reached
@@ -127,46 +128,6 @@ export default function Client(props: {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  useEffect(() => {
-    // Load existing chat messages if provided
-    if (props.existingChat?.messages) {
-      const loadedMessages: Message[] = props.existingChat.messages.map(
-        (msg) => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-          timestamp: new Date(msg.createdAt),
-        }),
-      );
-      setMessages(loadedMessages);
-    }
-
-    // Fetch all contexts from the database
-    const fetchContexts = async () => {
-      try {
-        const response = await fetch("/api/context");
-        if (response.ok) {
-          const data = await response.json();
-          setContexts(data);
-        }
-      } catch (err) {
-        console.error("Error fetching contexts:", err);
-      }
-    };
-    fetchContexts();
-
-    return () => {
-      disconnect();
-    };
-  }, []);
-
-  // Automatically connect when visiting an existing chat
-  useEffect(() => {
-    if (props.existingChat && !isConnected && !isLoading && !isLimitReached) {
-      connect(true); // Start with mic muted
-    }
-  }, [props.existingChat]);
 
   const createChat = async () => {
     try {
@@ -219,6 +180,31 @@ export default function Client(props: {
     }
   };
 
+  const handleResponseComplete = useCallback(
+    async (userText: string, assistantText: string) => {
+      // Create chat if needed
+      if (shouldCreateChatRef.current && !chat) {
+        try {
+          const newChat = await createChat();
+          shouldCreateChatRef.current = false;
+
+          // Save both messages to the new chat
+          if (newChat && userText && assistantText) {
+            await saveMessage("user", userText);
+            await saveMessage("assistant", assistantText);
+          }
+        } catch (err) {
+          console.error("Error creating chat:", err);
+        }
+      } else if (chat) {
+        // Save messages to existing chat
+        if (userText) await saveMessage("user", userText);
+        if (assistantText) await saveMessage("assistant", assistantText);
+      }
+    },
+    [chat],
+  );
+
   const connect = async (startMuted = false) => {
     try {
       setIsLoading(true);
@@ -229,52 +215,107 @@ export default function Client(props: {
         shouldCreateChatRef.current = true;
       }
 
-      // Get ephemeral token
-      const tokenResponse = await fetch("/api/realtime/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: props.defaultProject.id }),
+      const engine = createVoiceEngine({
+        onConnected: () => {
+          setIsConnected(true);
+          setIsLoading(false);
+        },
+        onDisconnected: () => {
+          setIsConnected(false);
+          setIsSpeaking(false);
+          setIsListening(false);
+        },
+        onError: (errorMsg) => {
+          setError(errorMsg);
+        },
+        onUserSpeechStart: () => {
+          setIsListening(true);
+        },
+        onUserSpeechEnd: () => {
+          setIsListening(false);
+        },
+        onUserTranscript: (id, text) => {
+          setIsListening(false);
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === id);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === id ? { ...m, content: text } : m,
+              );
+            } else {
+              return [
+                ...prev,
+                {
+                  id,
+                  role: "user",
+                  content: text,
+                  timestamp: new Date(),
+                },
+              ];
+            }
+          });
+        },
+        onAssistantTranscriptDelta: (id, delta, fullText) => {
+          if (!isSpeakingRef.current) {
+            isSpeakingRef.current = true;
+            setIsSpeaking(true);
+          }
+
+          // Update streaming ref
+          if (
+            !streamingMessageRef.current ||
+            streamingMessageRef.current.itemId !== id
+          ) {
+            streamingMessageRef.current = { itemId: id, content: fullText };
+          } else {
+            streamingMessageRef.current.content = fullText;
+          }
+
+          // Update messages with streaming content
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === id);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === id ? { ...m, content: fullText } : m,
+              );
+            } else {
+              return [
+                ...prev,
+                {
+                  id,
+                  role: "assistant",
+                  content: fullText,
+                  timestamp: new Date(),
+                },
+              ];
+            }
+          });
+        },
+        onAssistantTranscriptDone: (_id) => {
+          streamingMessageRef.current = null;
+        },
+        onAssistantSpeakingStart: () => {
+          if (!isSpeakingRef.current) {
+            isSpeakingRef.current = true;
+            setIsSpeaking(true);
+          }
+        },
+        onAssistantSpeakingEnd: () => {
+          isSpeakingRef.current = false;
+          setIsSpeaking(false);
+        },
+        onResponseComplete: (userText, assistantText) => {
+          handleResponseComplete(userText, assistantText);
+        },
       });
 
-      if (!tokenResponse.ok) {
-        throw new Error("Failed to get token");
-      }
+      engineRef.current = engine;
 
-      const { token } = await tokenResponse.json();
+      await engine.connect({ instructions, startMuted });
 
-      // Create the agent
-      const agent = new RealtimeAgent({
-        name: "Assistant",
-        instructions: instructions,
-        voice: "shimmer",
-      });
-
-      agentRef.current = agent;
-
-      // Create session with WebRTC transport (auto-configured in browser)
-      const session = new RealtimeSession(agent, {
-        model: Object.keys(LLMS)
-          .find((key) => LLMS[key as keyof typeof LLMS].realtime)
-          ?.split(":")[1],
-        transport: "webrtc", // SDK will auto-configure microphone and speakers
-      });
-
-      sessionRef.current = session;
-
-      // Set up event listeners before connecting
-      setupSessionListeners(session);
-
-      // Connect to the session
-      await session.connect({ apiKey: token });
-
-      // Mute the microphone if requested
       if (startMuted) {
-        session.mute(true);
         setIsMicMuted(true);
       }
-
-      setIsConnected(true);
-      setIsLoading(false);
     } catch (err) {
       console.error("Error connecting:", err);
       setError(
@@ -284,253 +325,11 @@ export default function Client(props: {
     }
   };
 
-  const setupSessionListeners = (session: RealtimeSession) => {
-    // Listen for streaming transcript deltas from transport layer (for assistant)
-    session.transport.on("audio_transcript_delta", (deltaEvent) => {
-      if (!isSpeakingRef.current) {
-        isSpeakingRef.current = true;
-        setIsSpeaking(true);
-      }
-
-      // Initialize or update streaming message
-      if (
-        !streamingMessageRef.current ||
-        streamingMessageRef.current.itemId !== deltaEvent.itemId
-      ) {
-        streamingMessageRef.current = {
-          itemId: deltaEvent.itemId,
-          content: deltaEvent.delta,
-        };
-      } else {
-        streamingMessageRef.current.content += deltaEvent.delta;
-      }
-
-      // Update messages with streaming content
-      setMessages((prev) => {
-        if (!streamingMessageRef.current) return prev;
-
-        const existing = prev.find((m) => m.id === deltaEvent.itemId);
-        if (existing) {
-          return prev.map((m) =>
-            m.id === deltaEvent.itemId
-              ? { ...m, content: streamingMessageRef.current!.content }
-              : m,
-          );
-        } else {
-          return [
-            ...prev,
-            {
-              id: deltaEvent.itemId,
-              role: "assistant",
-              content: streamingMessageRef.current!.content,
-              timestamp: new Date(),
-            },
-          ];
-        }
-      });
-    });
-
-    // Listen for when user starts speaking (audio buffer start)
-    session.transport.on("input_audio_buffer.speech_started", (event: any) => {
-      setIsListening(true);
-    });
-
-    // Listen for when user stops speaking (audio buffer end)
-    session.transport.on("input_audio_buffer.speech_stopped", (event: any) => {
-      setIsListening(false);
-    });
-
-    // Listen for user audio transcription completion
-    session.transport.on(
-      "conversation.item.input_audio_transcription.completed",
-      (event: any) => {
-        setIsListening(false);
-
-        setMessages((prev) => {
-          const existing = prev.find((m) => m.id === event.item_id);
-          if (existing) {
-            return prev.map((m) =>
-              m.id === event.item_id ? { ...m, content: event.transcript } : m,
-            );
-          } else {
-            return [
-              ...prev,
-              {
-                id: event.item_id,
-                role: "user",
-                content: event.transcript,
-                timestamp: new Date(),
-              },
-            ];
-          }
-        });
-      },
-    );
-
-    // Listen for history updates - but don't overwrite streaming messages or existing chat messages
-    session.on("history_updated", (history) => {
-      // Convert history to messages for UI
-      const newMessages: Message[] = [];
-
-      history.forEach((item) => {
-        if (item.type === "message") {
-          // Extract text from content array
-          const content = item.content
-            .map((c) => {
-              if ("text" in c) return c.text;
-              if ("transcript" in c && c.transcript) return c.transcript;
-              return "";
-            })
-            .filter(Boolean)
-            .join(" ");
-
-          if (content) {
-            newMessages.push({
-              id: item.itemId,
-              role: item.role as "user" | "assistant",
-              content,
-              timestamp: new Date(),
-            });
-          }
-        }
-      });
-
-      // Only update if we're not actively streaming, or merge with streaming content
-      setMessages((prev) => {
-        // Don't clear existing messages if history is empty (e.g., when reconnecting to existing chat)
-        if (newMessages.length === 0 && prev.length > 0) {
-          return prev;
-        }
-
-        if (streamingMessageRef.current) {
-          const streamingMsg = newMessages.find(
-            (msg) => msg.id === streamingMessageRef.current?.itemId,
-          );
-
-          // If history has more content than we're currently streaming, update the streaming ref
-          const updatedMessages = newMessages.map((msg) => {
-            if (msg.id === streamingMessageRef.current?.itemId) {
-              // If the new content is longer, extend the streaming ref so animation continues
-              if (
-                msg.content.length > streamingMessageRef.current!.content.length
-              ) {
-                streamingMessageRef.current!.content = msg.content;
-              } else if (msg.content === streamingMessageRef.current!.content) {
-                // Content matches exactly - streaming is complete
-                streamingMessageRef.current = null;
-              }
-              return {
-                ...msg,
-                content: streamingMessageRef.current?.content || msg.content,
-              };
-            }
-            return msg;
-          });
-
-          return updatedMessages;
-        }
-        return newMessages;
-      });
-    });
-
-    // When agent ends, save the conversation
-    session.on("agent_end", async (context, agent, output) => {
-      // Get the latest history to find user and assistant messages
-      const history = session.history;
-      let userText = "";
-      const assistantText = output;
-
-      // Find the last user message
-      for (let i = history.length - 1; i >= 0; i--) {
-        const item = history[i];
-        if (item.type === "message" && item.role === "user") {
-          const content = item.content
-            .map((c) => {
-              if ("text" in c) return c.text;
-              if ("transcript" in c && c.transcript) return c.transcript;
-              return "";
-            })
-            .filter(Boolean)
-            .join(" ");
-          userText = content;
-          break;
-        }
-      }
-
-      if (userText && assistantText) {
-        await handleResponseComplete(userText, assistantText);
-      }
-    });
-
-    // Listen for when assistant transcript is done (text generation complete)
-    session.transport.on("audio_transcript_done", (event: any) => {
-      streamingMessageRef.current = null;
-    });
-
-    // Listen for when audio playback has actually finished
-    // This event fires when the voice modality audio has stopped playing
-    session.transport.on("output_audio_buffer.stopped", (event: any) => {
-      isSpeakingRef.current = false;
-      setIsSpeaking(false);
-    });
-
-    // Fallback: Also listen for response.done in case output_audio_buffer.stopped doesn't fire
-    // (e.g., for text-only responses)
-    session.transport.on("response.done", (event: any) => {
-      // Only clear speaking state if there's no audio being played
-      // The output_audio_buffer.stopped will handle it otherwise
-      if (!isSpeakingRef.current) {
-        setIsSpeaking(false);
-      }
-    });
-
-    // Listen for audio interruptions
-    session.transport.on("conversation.interrupted", () => {
-      isSpeakingRef.current = false;
-      setIsSpeaking(false);
-    });
-
-    // Handle errors
-    session.on("error", (errorEvent) => {
-      setError(
-        errorEvent.error instanceof Error
-          ? errorEvent.error.message
-          : "An error occurred",
-      );
-    });
-  };
-
-  const handleResponseComplete = async (
-    userText: string,
-    assistantText: string,
-  ) => {
-    // Create chat if needed
-    if (shouldCreateChatRef.current && !chat) {
-      try {
-        const newChat = await createChat();
-        shouldCreateChatRef.current = false;
-
-        // Save both messages to the new chat
-        if (newChat && userText && assistantText) {
-          await saveMessage("user", userText);
-          await saveMessage("assistant", assistantText);
-        }
-      } catch (err) {
-        console.error("Error creating chat:", err);
-      }
-    } else if (chat) {
-      // Save messages to existing chat
-      if (userText) await saveMessage("user", userText);
-      if (assistantText) await saveMessage("assistant", assistantText);
-    }
-  };
-
   const disconnect = () => {
-    if (sessionRef.current) {
-      sessionRef.current.close();
-      sessionRef.current = null;
+    if (engineRef.current) {
+      engineRef.current.disconnect();
+      engineRef.current = null;
     }
-    agentRef.current = null;
     setIsConnected(false);
     setIsSpeaking(false);
     setIsListening(false);
@@ -538,6 +337,46 @@ export default function Client(props: {
     setIsSpeakerMuted(false);
     setError(null);
   };
+
+  useEffect(() => {
+    // Load existing chat messages if provided
+    if (props.existingChat?.messages) {
+      const loadedMessages: Message[] = props.existingChat.messages.map(
+        (msg) => ({
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          timestamp: new Date(msg.createdAt),
+        }),
+      );
+      setMessages(loadedMessages);
+    }
+
+    // Fetch all contexts from the database
+    const fetchContexts = async () => {
+      try {
+        const response = await fetch("/api/context");
+        if (response.ok) {
+          const data = await response.json();
+          setContexts(data);
+        }
+      } catch (err) {
+        console.error("Error fetching contexts:", err);
+      }
+    };
+    fetchContexts();
+
+    return () => {
+      disconnect();
+    };
+  }, []);
+
+  // Automatically connect when visiting an existing chat
+  useEffect(() => {
+    if (props.existingChat && !isConnected && !isLoading && !isLimitReached) {
+      connect(true); // Start with mic muted
+    }
+  }, [props.existingChat]);
 
   const sendTextMessage = async () => {
     if (!inputText.trim()) return;
@@ -547,27 +386,17 @@ export default function Client(props: {
 
     try {
       // If not connected, connect first with muted mic
-      if (!sessionRef.current) {
+      if (!engineRef.current) {
         await connect(true);
         // Wait a brief moment for session to be ready
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      if (!sessionRef.current) {
+      if (!engineRef.current) {
         throw new Error("Failed to establish session");
       }
 
-      // Send text message to the session
-      sessionRef.current.sendMessage({
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: messageText,
-          },
-        ],
-      });
+      engineRef.current.sendTextMessage(messageText);
     } catch (err) {
       console.error("Error sending message:", err);
       setError("Failed to send message");
@@ -582,9 +411,9 @@ export default function Client(props: {
   };
 
   const toggleMicMute = () => {
-    if (sessionRef.current) {
+    if (engineRef.current) {
       const newMutedState = !isMicMuted;
-      sessionRef.current.mute(newMutedState);
+      engineRef.current.mute(newMutedState);
       setIsMicMuted(newMutedState);
     }
   };
@@ -593,23 +422,8 @@ export default function Client(props: {
     const newMutedState = !isSpeakerMuted;
     setIsSpeakerMuted(newMutedState);
 
-    // Access the WebRTC transport's connection state to get the peer connection
-    if (sessionRef.current?.transport) {
-      const transport = sessionRef.current.transport as any;
-
-      // The OpenAI SDK stores the peer connection in connectionState.peerConnection
-      const connectionState = transport.connectionState;
-      const peerConnection: RTCPeerConnection | undefined =
-        connectionState?.peerConnection;
-
-      if (peerConnection) {
-        // Mute incoming audio by disabling receiver tracks (this is the speaker output)
-        peerConnection.getReceivers().forEach((receiver: RTCRtpReceiver) => {
-          if (receiver.track && receiver.track.kind === "audio") {
-            receiver.track.enabled = !newMutedState;
-          }
-        });
-      }
+    if (engineRef.current) {
+      engineRef.current.muteSpeaker(newMutedState);
     }
   };
 
@@ -633,7 +447,7 @@ export default function Client(props: {
           <MessageSquare className="h-5 w-5" />
           <span>Chat History</span>
         </Button>
-        {(props.existingChat || !!sessionRef.current) && (
+        {(props.existingChat || !!engineRef.current) && (
           <Button
             asChild
             variant="outline"

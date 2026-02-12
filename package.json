@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "worker:watch": "tsx watch jobs/test-run.ts",
-    "worker": "tsx jobs/test-run.ts"
+    "worker": "tsx watch jobs/test-run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.29",
@@ -31,12 +30,12 @@
     "@rive-app/react-webgl2": "^4.26.2",
     "@tanstack/react-form": "^1.28.0",
     "@tanstack/react-query": "^5.90.20",
+    "@types/ws": "^8.18.1",
     "ai": "^6.0.59",
     "bullmq": "^5.67.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
-    "dotenv": "^17.2.3",
     "ioredis": "^5.9.2",
     "jotai": "^2.17.1",
     "js-tiktoken": "^1.0.21",
@@ -48,8 +47,10 @@
     "prisma": "6.19.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "sarvam-conv-ai-sdk": "^0.0.27",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
