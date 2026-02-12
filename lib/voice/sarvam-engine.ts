@@ -114,6 +114,25 @@ export class SarvamVoiceEngine implements VoiceEngine {
               this.currentUserText,
             );
             break;
+          case "server.event.transcription":
+            // Handle new transcription event from Sarvam SDK
+            if (event.data?.role === "user") {
+              this.currentUserText = event.data?.content || "";
+              this.callbacks.onUserTranscript(
+                `sarvam-user-${this.userMsgId}`,
+                this.currentUserText,
+              );
+            } else if (event.data?.role === "bot") {
+              // For bot transcription, treat it as assistant text delta
+              const text = event.data?.content || "";
+              this.currentAssistantText += text;
+              this.callbacks.onAssistantTranscriptDelta(
+                `sarvam-assistant-${this.assistantMsgId}`,
+                text,
+                this.currentAssistantText,
+              );
+            }
+            break;
           case "server.event.agent_response_start":
             this.assistantMsgId++;
             this.currentAssistantText = "";

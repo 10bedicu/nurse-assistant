@@ -8,6 +8,7 @@ import {
   FileText,
   MessageSquare,
   FolderKanban,
+  Settings,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -121,6 +122,14 @@ export function AdminSidebar({
               <Link href={"/admin/projects"}>
                 <FolderKanban />
                 <span>Projects</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href={"/admin/settings"}>
+                <Settings />
+                <span>Settings</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

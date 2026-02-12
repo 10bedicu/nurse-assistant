@@ -215,7 +215,7 @@ export default function Client(props: {
         shouldCreateChatRef.current = true;
       }
 
-      const engine = createVoiceEngine({
+      const engine = await createVoiceEngine({
         onConnected: () => {
           setIsConnected(true);
           setIsLoading(false);
