@@ -9,9 +9,8 @@ export async function createVoiceEngine(
   callbacks: VoiceEngineCallbacks,
   modelId?: string,
 ): Promise<VoiceEngine> {
-  let provider = "openai"; // Default provider
+  let provider = "openai";
 
-  // If modelId is provided, use voice provider from model config
   if (modelId && modelId in LLMS) {
     const modelConfig = LLMS[modelId as keyof typeof LLMS];
     if ("voiceProvider" in modelConfig && modelConfig.voiceProvider) {

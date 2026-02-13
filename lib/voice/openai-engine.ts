@@ -18,7 +18,6 @@ export class OpenAIVoiceEngine implements VoiceEngine {
     instructions: string;
     startMuted?: boolean;
   }): Promise<void> {
-    // Get ephemeral token
     const tokenResponse = await fetch("/api/realtime/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -31,7 +30,6 @@ export class OpenAIVoiceEngine implements VoiceEngine {
 
     const { token } = await tokenResponse.json();
 
-    // Create the agent
     const agent = new RealtimeAgent({
       name: "Assistant",
       instructions: options.instructions,
@@ -39,7 +37,6 @@ export class OpenAIVoiceEngine implements VoiceEngine {
     });
     this.agent = agent;
 
-    // Create session with WebRTC transport
     const session = new RealtimeSession(agent, {
       model: Object.keys(LLMS)
         .find((key) => {
@@ -111,7 +108,6 @@ export class OpenAIVoiceEngine implements VoiceEngine {
   }
 
   private setupListeners(session: RealtimeSession): void {
-    // Assistant transcript streaming
     session.transport.on("audio_transcript_delta", (deltaEvent) => {
       this.callbacks.onAssistantSpeakingStart();
 
@@ -126,17 +122,14 @@ export class OpenAIVoiceEngine implements VoiceEngine {
       );
     });
 
-    // User speech start
     session.transport.on("input_audio_buffer.speech_started", () => {
       this.callbacks.onUserSpeechStart();
     });
 
-    // User speech end
     session.transport.on("input_audio_buffer.speech_stopped", () => {
       this.callbacks.onUserSpeechEnd();
     });
 
-    // User audio transcription completed
     session.transport.on(
       "conversation.item.input_audio_transcription.completed",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,10 +139,8 @@ export class OpenAIVoiceEngine implements VoiceEngine {
       },
     );
 
-    // History updates - handled at the client level via callbacks
-    session.on("history_updated", () => {});
+    session.on("history_updated", () => {    });
 
-    // Agent end - extract user/assistant text for persistence
     session.on("agent_end", async (_context, _agent, output) => {
       const history = session.history;
       let userText = "";
@@ -176,7 +167,6 @@ export class OpenAIVoiceEngine implements VoiceEngine {
       }
     });
 
-    // Transcript done
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     session.transport.on("audio_transcript_done", (event: any) => {
       const itemId =
@@ -189,22 +179,16 @@ export class OpenAIVoiceEngine implements VoiceEngine {
       }
     });
 
-    // Audio playback finished
     session.transport.on("output_audio_buffer.stopped", () => {
       this.callbacks.onAssistantSpeakingEnd();
     });
 
-    // Fallback for text-only responses
-    session.transport.on("response.done", () => {
-      // onAssistantSpeakingEnd will be called by output_audio_buffer.stopped for audio
-    });
+    session.transport.on("response.done", () => {});
 
-    // Audio interruptions
     session.transport.on("conversation.interrupted", () => {
       this.callbacks.onAssistantSpeakingEnd();
     });
 
-    // Errors
     session.on("error", (errorEvent) => {
       this.callbacks.onError(
         errorEvent.error instanceof Error

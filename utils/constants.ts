@@ -3,26 +3,13 @@ export type VoiceProvider = "openai" | "sarvam";
 
 export type LlmConfig = {
   name: string;
-  /**
-   * Which stack to use for TEXT generation.
-   * - "vercel": Vercel AI SDK (provider:model-id)
-   * - "realtime": OpenAI Realtime API
-   *
-   * Note: Audio always uses the Realtime API regardless of model selection.
-   */
   textTransport: LlmTransport;
-  /** Whether this model supports the realtime voice API */
   realtime?: boolean;
-  /** Context window token limit for this model */
   contextLimit?: number;
-  /** Voice provider for realtime voice interactions */
   voiceProvider?: VoiceProvider;
 };
 
 export const LLMS = {
-  /**
-   * Sarvam Multilingual Voice Models
-   */
   "sarvam:multilingual": {
     name: "Sarvam AI (Multilingual Voice)",
     textTransport: "realtime",
@@ -30,11 +17,6 @@ export const LLMS = {
     voiceProvider: "sarvam" as const,
     contextLimit: 32_000,
   },
-
-  /**
-   * Standard text models (generated via Vercel AI SDK using BYOK provider keys)
-   * Key format: provider:model-id
-   */
   "openai:gpt-5-mini-2025-08-07": {
     name: "GPT-5 Mini",
     textTransport: "vercel",

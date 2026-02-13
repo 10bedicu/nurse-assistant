@@ -1,6 +1,5 @@
 import type { VoiceEngine, VoiceEngineCallbacks } from "./types";
 
-// Dynamic import types - actual imports happen at runtime to avoid SSR issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SarvamConversationAgent = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,7 +25,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
     instructions: string;
     startMuted?: boolean;
   }): Promise<void> {
-    // API key is read from env at build time; never exposed via a public API route
     const apiKey = process.env.NEXT_PUBLIC_SARVAM_API_KEY;
 
     if (!apiKey) {
@@ -35,7 +33,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
       );
     }
 
-    // Optional: verify Sarvam is configured (route returns only { configured }, no secrets)
     const configResponse = await fetch("/api/realtime/sarvam-config");
     if (configResponse.ok) {
       const { configured } = await configResponse.json();
@@ -44,7 +41,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
       }
     }
 
-    // Dynamic import to avoid SSR issues with browser-only SDK
     const { ConversationAgent, BrowserAudioInterface, InteractionType } =
       await import("sarvam-conv-ai-sdk/browser");
 
@@ -54,7 +50,7 @@ export class SarvamVoiceEngine implements VoiceEngine {
     const orgId = process.env.NEXT_PUBLIC_SARVAM_ORG_ID;
     const workspaceId = process.env.NEXT_PUBLIC_SARVAM_WORKSPACE_ID;
     const appId = process.env.NEXT_PUBLIC_SARVAM_APP_ID;
-    const version = process.env.NEXT_PUBLIC_SARVAM_VERSION; // Optional: specific version or "latest"
+    const version = process.env.NEXT_PUBLIC_SARVAM_VERSION;
 
     if (!orgId || !workspaceId || !appId) {
       throw new Error(
@@ -62,7 +58,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
       );
     }
 
-    // Build config object per Sarvam SDK documentation
     const config = {
       user_identifier_type: "email" as const,
       user_identifier: "care-admin@care.org",
@@ -72,16 +67,8 @@ export class SarvamVoiceEngine implements VoiceEngine {
       interaction_type: InteractionType.CALL,
       input_sample_rate: 16000 as const,
       output_sample_rate: 16000 as const,
-      ...(version && { version: parseInt(version, 10) }), // Must be integer
+      ...(version && { version: parseInt(version, 10) }),
     };
-
-    console.log("Sarvam Agent Config:", {
-      org_id: orgId,
-      workspace_id: workspaceId,
-      app_id: appId,
-      interaction_type: "CALL",
-      version: version || "latest committed",
-    });
 
     const agent = new ConversationAgent({
       apiKey,
@@ -109,18 +96,15 @@ export class SarvamVoiceEngine implements VoiceEngine {
             this.callbacks.onUserSpeechEnd();
             break;
           case "server.event.user_interrupt":
-            // Mark current assistant message as done
             if (this.currentAssistantText) {
               const assistantId = `sarvam-assistant-${this.assistantMsgId}`;
               this.callbacks.onAssistantTranscriptDone(assistantId);
             }
 
-            // Interrupt audio playback
             if (this.audioInterface) {
               this.audioInterface.interrupt();
             }
 
-            // Reset state
             this.currentAssistantText = "";
             this.callbacks.onAssistantSpeakingEnd();
             break;
@@ -132,7 +116,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
             );
             break;
           case "server.event.transcription": {
-            // SDK passes "Unknown" events as flat objects — role/content at top level
             const role = event.role ?? event.data?.role;
             const content = event.content ?? event.data?.content ?? "";
 
@@ -191,7 +174,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
 
     await agent.start();
 
-    // Wait for connection with timeout
     const isStarted = await agent.waitForConnect(10);
     if (!isStarted) {
       throw new Error("Failed to connect to Sarvam - connection timeout");
@@ -223,12 +205,10 @@ export class SarvamVoiceEngine implements VoiceEngine {
       ai.isRecording = !muted;
 
       if (muted) {
-        // Physically disconnect mic from processing pipeline
-        try { ai.sourceNode?.disconnect(); } catch { /* may already be disconnected */ }
+        try { ai.sourceNode?.disconnect(); } catch {}
         this.audioInterface.interrupt?.();
       } else {
-        // Reconnect mic to processing pipeline
-        try { ai.sourceNode?.connect(ai.inputWorklet); } catch { /* worklet may not exist yet */ }
+        try { ai.sourceNode?.connect(ai.inputWorklet); } catch {}
       }
     }
   }
@@ -238,7 +218,6 @@ export class SarvamVoiceEngine implements VoiceEngine {
 
     if (this.audioInterface) {
       if (muted) {
-        // Store original output method, replace with no-op to prevent audio buffering
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ai = this.audioInterface as any;
         if (!ai._originalOutput) {
@@ -246,10 +225,8 @@ export class SarvamVoiceEngine implements VoiceEngine {
         }
         this.audioInterface.output = async () => {};
 
-        // Clear any currently playing audio
         this.audioInterface.interrupt?.();
       } else {
-        // Restore original output method
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ai = this.audioInterface as any;
         if (ai._originalOutput) {
