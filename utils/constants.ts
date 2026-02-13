@@ -1,4 +1,5 @@
 export type LlmTransport = "vercel" | "realtime";
+export type VoiceProvider = "openai" | "sarvam";
 
 export type LlmConfig = {
   name: string;
@@ -14,23 +15,35 @@ export type LlmConfig = {
   realtime?: boolean;
   /** Context window token limit for this model */
   contextLimit?: number;
+  /** Voice provider for realtime voice interactions */
+  voiceProvider?: VoiceProvider;
 };
 
 export const LLMS = {
   /**
-   * Realtime models (text will be generated via Realtime API).
-   * Key format is intentionally NOT provider:model-id, since it is not consumed
-   * by the Vercel AI SDK factory.
+   * OpenAI Realtime models
    */
   "realtime:gpt-realtime": {
     name: "OpenAI Realtime (gpt-realtime)",
     textTransport: "realtime",
     realtime: true,
+    voiceProvider: "openai" as const,
     contextLimit: 128_000,
   },
 
   /**
-   * Standard text models (generated via Vercel AI SDK using BYOK provider keys).
+   * Sarvam Multilingual Voice Models
+   */
+  "sarvam:multilingual": {
+    name: "Sarvam AI (Multilingual Voice)",
+    textTransport: "realtime",
+    realtime: true,
+    voiceProvider: "sarvam" as const,
+    contextLimit: 32_000,
+  },
+
+  /**
+   * Standard text models (generated via Vercel AI SDK using BYOK provider keys)
    * Key format: provider:model-id
    */
   "openai:gpt-5-mini-2025-08-07": {
@@ -42,9 +55,10 @@ export const LLMS = {
     textTransport: "vercel",
   },
   "openai:gpt-realtime-2025-08-28": {
-    name: "GPT Realtime",
+    name: "GPT Realtime (OpenAI API)",
     textTransport: "realtime",
     realtime: true,
+    voiceProvider: "openai" as const,
     contextLimit: 128_000,
   },
 } as const satisfies Record<string, LlmConfig>;

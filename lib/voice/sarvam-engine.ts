@@ -192,11 +192,21 @@ export class SarvamVoiceEngine implements VoiceEngine {
   }
 
   mute(muted: boolean): void {
-    if (this.audioInterface) {
+    if (this.agent) {
       if (muted) {
-        this.audioInterface.pauseRecording?.();
+        // Pause input when muting
+        if (this.agent.pauseInput) {
+          this.agent.pauseInput();
+        } else if (this.audioInterface?.pauseRecording) {
+          this.audioInterface.pauseRecording();
+        }
       } else {
-        this.audioInterface.resumeRecording?.();
+        // Resume input when unmuting
+        if (this.agent.resumeInput) {
+          this.agent.resumeInput();
+        } else if (this.audioInterface?.resumeRecording) {
+          this.audioInterface.resumeRecording();
+        }
       }
     }
   }

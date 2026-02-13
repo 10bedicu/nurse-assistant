@@ -8,6 +8,7 @@ export class OpenAIVoiceEngine implements VoiceEngine {
   private callbacks: VoiceEngineCallbacks;
   private connected = false;
   private streamingContent: Map<string, string> = new Map();
+  private speakerMuted = false;
 
   constructor(callbacks: VoiceEngineCallbacks) {
     this.callbacks = callbacks;
@@ -78,6 +79,7 @@ export class OpenAIVoiceEngine implements VoiceEngine {
   }
 
   muteSpeaker(muted: boolean): void {
+    this.speakerMuted = muted;
     if (!this.session?.transport) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

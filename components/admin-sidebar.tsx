@@ -2,19 +2,14 @@
 
 import * as React from "react";
 import {
-  Bot,
   ChevronRight,
   SquareTerminal,
   FileText,
   MessageSquare,
   FolderKanban,
-  Settings,
 } from "lucide-react";
 
-import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
-import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -68,7 +63,6 @@ export function AdminSidebar({
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <Link href="/admin">
-                {/* <IconInnerShadowTop className="size-5!" /> */}
                 <span className="text-base font-semibold">Nurse Assistant</span>
               </Link>
             </SidebarMenuButton>
@@ -125,16 +119,7 @@ export function AdminSidebar({
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href={"/admin/settings"}>
-                <Settings />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
-        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

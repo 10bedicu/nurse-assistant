@@ -215,7 +215,8 @@ export default function Client(props: {
         shouldCreateChatRef.current = true;
       }
 
-      const engine = await createVoiceEngine({
+      const engine = await createVoiceEngine(
+        {
         onConnected: () => {
           setIsConnected(true);
           setIsLoading(false);
@@ -307,7 +308,9 @@ export default function Client(props: {
         onResponseComplete: (userText, assistantText) => {
           handleResponseComplete(userText, assistantText);
         },
-      });
+      },
+      props.defaultProject.llmModel,
+    );
 
       engineRef.current = engine;
 
