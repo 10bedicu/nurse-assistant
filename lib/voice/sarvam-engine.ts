@@ -16,6 +16,7 @@ export class SarvamVoiceEngine implements VoiceEngine {
   private assistantMsgId = 0;
   private userMsgId = 0;
   private speakerMuted = false;
+  private micMuted = false;
 
   constructor(callbacks: VoiceEngineCallbacks) {
     this.callbacks = callbacks;
@@ -86,7 +87,7 @@ export class SarvamVoiceEngine implements VoiceEngine {
         );
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      eventCallback: async (event: { type: string; data?: any }) => {
+      eventCallback: async (event: { type: string; data?: any; role?: string; content?: string; text?: string }) => {
         switch (event.type) {
           case "server.event.user_speech_start":
             this.userMsgId++;
@@ -97,42 +98,53 @@ export class SarvamVoiceEngine implements VoiceEngine {
             this.callbacks.onUserSpeechEnd();
             break;
           case "server.event.user_interrupt":
+            // Mark current assistant message as done
             if (this.currentAssistantText) {
               const assistantId = `sarvam-assistant-${this.assistantMsgId}`;
               this.callbacks.onAssistantTranscriptDone(assistantId);
             }
+
+            // Interrupt audio playback
             if (this.audioInterface) {
-              this.audioInterface.interrupt?.();
+              this.audioInterface.interrupt();
             }
-            this.callbacks.onAssistantSpeakingEnd();
+
+            // Reset state
             this.currentAssistantText = "";
+            this.callbacks.onAssistantSpeakingEnd();
             break;
           case "server.event.user_transcript":
-            this.currentUserText = event.data?.text || "";
+            this.currentUserText = event.text ?? event.data?.text ?? "";
             this.callbacks.onUserTranscript(
               `sarvam-user-${this.userMsgId}`,
               this.currentUserText,
             );
             break;
-          case "server.event.transcription":
-            // Handle new transcription event from Sarvam SDK
-            if (event.data?.role === "user") {
-              this.currentUserText = event.data?.content || "";
+          case "server.event.transcription": {
+            // SDK passes "Unknown" events as flat objects — role/content at top level
+            const role = event.role ?? event.data?.role;
+            const content = event.content ?? event.data?.content ?? "";
+
+            if (role === "user" && this.micMuted) break;
+            if (role === "bot" && this.speakerMuted) break;
+
+            if (role === "user") {
+              this.currentUserText = content;
               this.callbacks.onUserTranscript(
                 `sarvam-user-${this.userMsgId}`,
                 this.currentUserText,
               );
-            } else if (event.data?.role === "bot") {
-              // For bot transcription, treat it as assistant text delta
-              const text = event.data?.content || "";
-              this.currentAssistantText += text;
+            } else if (role === "bot") {
+              const id = `sarvam-assistant-${this.assistantMsgId}`;
+              this.currentAssistantText += content;
               this.callbacks.onAssistantTranscriptDelta(
-                `sarvam-assistant-${this.assistantMsgId}`,
-                text,
+                id,
+                content,
                 this.currentAssistantText,
               );
             }
             break;
+          }
           case "server.event.agent_response_start":
             this.assistantMsgId++;
             this.currentAssistantText = "";
@@ -192,32 +204,47 @@ export class SarvamVoiceEngine implements VoiceEngine {
   }
 
   mute(muted: boolean): void {
-    if (this.agent) {
+    this.micMuted = muted;
+
+    if (this.audioInterface) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ai = this.audioInterface as any;
+      ai.isRecording = !muted;
+
       if (muted) {
-        // Pause input when muting
-        if (this.agent.pauseInput) {
-          this.agent.pauseInput();
-        } else if (this.audioInterface?.pauseRecording) {
-          this.audioInterface.pauseRecording();
-        }
+        // Physically disconnect mic from processing pipeline
+        try { ai.sourceNode?.disconnect(); } catch { /* may already be disconnected */ }
+        this.audioInterface.interrupt?.();
       } else {
-        // Resume input when unmuting
-        if (this.agent.resumeInput) {
-          this.agent.resumeInput();
-        } else if (this.audioInterface?.resumeRecording) {
-          this.audioInterface.resumeRecording();
-        }
+        // Reconnect mic to processing pipeline
+        try { ai.sourceNode?.connect(ai.inputWorklet); } catch { /* worklet may not exist yet */ }
       }
     }
   }
 
   muteSpeaker(muted: boolean): void {
     this.speakerMuted = muted;
+
     if (this.audioInterface) {
       if (muted) {
-        this.audioInterface.pausePlayback?.();
+        // Store original output method, replace with no-op to prevent audio buffering
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ai = this.audioInterface as any;
+        if (!ai._originalOutput) {
+          ai._originalOutput = this.audioInterface.output.bind(this.audioInterface);
+        }
+        this.audioInterface.output = async () => {};
+
+        // Clear any currently playing audio
+        this.audioInterface.interrupt?.();
       } else {
-        this.audioInterface.resumePlayback?.();
+        // Restore original output method
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ai = this.audioInterface as any;
+        if (ai._originalOutput) {
+          this.audioInterface.output = ai._originalOutput;
+          delete ai._originalOutput;
+        }
       }
     }
   }
