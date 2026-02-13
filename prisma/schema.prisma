@@ -149,12 +149,3 @@ model Login {
   token     String   @unique
   createdAt DateTime @default(now())
 }
-
-model Config {
-  id             String   @id @default(cuid())
-  key            String   @unique
-  value          String
-  description    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}

@@ -26,12 +26,23 @@ export class SarvamVoiceEngine implements VoiceEngine {
     instructions: string;
     startMuted?: boolean;
   }): Promise<void> {
-    // Fetch API key from server
-    const configResponse = await fetch("/api/realtime/sarvam-config");
-    if (!configResponse.ok) {
-      throw new Error("Failed to get Sarvam configuration");
+    // API key is read from env at build time; never exposed via a public API route
+    const apiKey = process.env.NEXT_PUBLIC_SARVAM_API_KEY;
+
+    if (!apiKey) {
+      throw new Error(
+        "Sarvam API key not configured. Set NEXT_PUBLIC_SARVAM_API_KEY in your environment.",
+      );
     }
-    const { apiKey } = await configResponse.json();
+
+    // Optional: verify Sarvam is configured (route returns only { configured }, no secrets)
+    const configResponse = await fetch("/api/realtime/sarvam-config");
+    if (configResponse.ok) {
+      const { configured } = await configResponse.json();
+      if (!configured) {
+        throw new Error("Sarvam is not configured on the server");
+      }
+    }
 
     // Dynamic import to avoid SSR issues with browser-only SDK
     const { ConversationAgent, BrowserAudioInterface, InteractionType } =

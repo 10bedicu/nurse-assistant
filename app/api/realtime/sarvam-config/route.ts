@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const apiKey = process.env.SARVAM_API_KEY;
+  const hasApiKey = Boolean(process.env.SARVAM_API_KEY);
 
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "SARVAM_API_KEY is not configured" },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({ apiKey });
+  return NextResponse.json({
+    configured: hasApiKey,
+  });
 }

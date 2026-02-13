@@ -21,17 +21,6 @@ export type LlmConfig = {
 
 export const LLMS = {
   /**
-   * OpenAI Realtime models
-   */
-  "realtime:gpt-realtime": {
-    name: "OpenAI Realtime (gpt-realtime)",
-    textTransport: "realtime",
-    realtime: true,
-    voiceProvider: "openai" as const,
-    contextLimit: 128_000,
-  },
-
-  /**
    * Sarvam Multilingual Voice Models
    */
   "sarvam:multilingual": {

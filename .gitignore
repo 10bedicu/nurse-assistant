@@ -72,3 +72,6 @@ next-env.d.ts
 # AI conversation logs
 *.plan.md
 .cursorignore
+
+# Serena (AI/tooling project config - local only)
+.serena/
