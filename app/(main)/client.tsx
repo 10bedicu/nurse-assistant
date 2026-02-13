@@ -10,10 +10,9 @@ import {
   Send,
   Loader2,
   AlertCircle,
-  Volume2,
-  VolumeX,
   MessageSquare,
   Plus,
+  Square,
 } from "lucide-react";
 import { Persona } from "@/components/ai-elements/persona";
 import { ChatSerialized } from "@/utils/schemas/chat";
@@ -52,7 +51,6 @@ export default function Client(props: {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [contexts, setContexts] = useState<ContextSerialized[]>([]);
   const [tokenCount, setTokenCount] = useState(0);
 
@@ -337,7 +335,6 @@ export default function Client(props: {
     setIsSpeaking(false);
     setIsListening(false);
     setIsMicMuted(false);
-    setIsSpeakerMuted(false);
     setError(null);
   };
 
@@ -410,6 +407,15 @@ export default function Client(props: {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendTextMessage();
+    }
+  };
+
+  const interruptAgent = () => {
+    if (sessionRef.current) {
+      sessionRef.current.interrupt();
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
+      streamingMessageRef.current = null;
     }
   };
 
@@ -614,17 +620,17 @@ export default function Client(props: {
                     )}
                   </Button>
                   <Button
-                    onClick={toggleSpeakerMute}
-                    variant={isSpeakerMuted ? "destructive" : "outline"}
+                    onClick={interruptAgent}
+                    variant="destructive"
                     size="icon"
-                    className="flex-1 w-15 h-15 aspect-square rounded-full"
-                    title={isSpeakerMuted ? "Unmute sound" : "Mute sound"}
-                  >
-                    {isSpeakerMuted ? (
-                      <VolumeX className="h-5 w-5" />
-                    ) : (
-                      <Volume2 className="h-5 w-5" />
+                    disabled={!isSpeaking}
+                    className={cn(
+                      "flex-1 w-15 h-15 aspect-square rounded-full transition-opacity duration-300 opacity-0 disabled:opacity-0",
+                      isSpeaking && "opacity-100",
                     )}
+                    title="Stop speaking"
+                  >
+                    <Square className="h-5 w-5" />
                   </Button>
                 </div>
               )}
