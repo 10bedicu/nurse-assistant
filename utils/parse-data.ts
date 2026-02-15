@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import type { z } from "zod";
 import { zodErrorSerializer } from "./schemas/base";
 
-function __parseData<T extends z.ZodTypeAny>(data: any, schema: T) {
+function __parseData<T extends z.ZodTypeAny>(data: unknown, schema: T) {
   const parsedFilters = schema.safeParse(data);
 
   if (!parsedFilters.success) {

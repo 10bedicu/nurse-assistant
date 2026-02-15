@@ -45,20 +45,6 @@ next-env.d.ts
 # prisma client
 /prisma/client/
 
-# IDE and AI tools
-.cursor/
-.claude/
-.agents/
-.agent/
-.codex/
-.aider*
-.continue/
-.codeium/
-.tabnine/
-.sourcegraph/
-.gemini/
-.opencode/
-.copilot/
 
 # Editor specific
 .idea/
@@ -68,7 +54,3 @@ next-env.d.ts
 *.swp
 *.swo
 *~
-
-# AI conversation logs
-*.plan.md
-.cursorignore

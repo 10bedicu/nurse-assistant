@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
             type: "realtime",
             model:
               Object.keys(LLMS)
-                .find((key) => LLMS[key as keyof typeof LLMS].realtime)
+                .find((key) => {
+                  const config = LLMS[key as keyof typeof LLMS];
+                  return "realtime" in config && config.realtime === true;
+                })
                 ?.split(":")[1] || "NA",
           },
         }),

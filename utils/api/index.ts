@@ -14,14 +14,14 @@ type methods = "POST" | "GET" | "PATCH" | "DELETE" | "PUT";
 type options = {
   formdata?: boolean;
   external?: boolean;
-  headers?: any;
+  headers?: Record<string, string>;
   auth?: boolean;
 };
 
-export const request = async <T = any>(
+export const request = async <T = Record<string, unknown>>(
   endpoint: endpoint,
   method: methods = "GET",
-  data: any = {},
+  data: Record<string, unknown> = {},
   options: options = {},
 ): Promise<T> => {
   const { formdata, external, headers, auth: isAuth } = options;
@@ -45,6 +45,7 @@ export const request = async <T = any>(
         typeof navigator !== "undefined" ? navigator.userAgent : undefined,
     };
   } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { cookies } = (globalThis as any).require("next/headers");
     const cookieStore = await cookies();
     const cookie = cookieStore.get("writerooAuthToken");
@@ -61,7 +62,7 @@ export const request = async <T = any>(
       : "Bearer " + localToken;
 
   let url = external ? endpoint : "/api" + endpoint;
-  let payload: null | string = formdata ? data : JSON.stringify(data);
+  let payload: BodyInit | null = formdata ? (data as unknown as BodyInit) : JSON.stringify(data);
 
   if (method === "GET") {
     const requestParams = data
@@ -77,7 +78,7 @@ export const request = async <T = any>(
   try {
     const response = await fetch(url, {
       method: method,
-      headers: external
+      headers: (external
         ? { ...headers }
         : {
             Accept: "application/json",
@@ -85,12 +86,12 @@ export const request = async <T = any>(
             "X-Device-Info": JSON.stringify(deviceInfo),
             Authorization: auth,
             ...headers,
-          },
+          }) as HeadersInit,
       body: payload,
     });
     const txt = await response.clone().text();
     if (txt === "") {
-      return {} as any;
+      return {} as T;
     }
     const json = await response.clone().json();
     if (json && response.ok) {
